@@ -1,32 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-
-type UserType = {
-  name: string;
-  description: string;
-};
-
-type Foundation = {
-  authentication: boolean;
-  database: boolean;
-  rolesAndPermissions: boolean;
-  billing: boolean;
-  email: boolean;
-  errorHandling: boolean;
-  testing: boolean;
-};
-
-type Analysis = {
-  productName: string;
-  summary: string;
-  users: UserType[];
-  features: string[];
-  dataModel: string[];
-  foundation: Foundation;
-  recommendations: string[];
-};
+import type {
+  Analysis,
+  Foundation,
+  UserType,
+} from "@/types/application";
 
 export default function ArchitectPage() {
   const searchParams = useSearchParams();
@@ -35,6 +16,8 @@ export default function ArchitectPage() {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [approved, setApproved] = useState(false);
 
   useEffect(() => {
     async function analyzeIdea() {
@@ -79,22 +62,203 @@ export default function ArchitectPage() {
     analyzeIdea();
   }, [idea]);
 
+  function updateProductName(value: string) {
+    setAnalysis((current) =>
+      current
+        ? {
+            ...current,
+            productName: value,
+          }
+        : current
+    );
+  }
+
+  function updateSummary(value: string) {
+    setAnalysis((current) =>
+      current
+        ? {
+            ...current,
+            summary: value,
+          }
+        : current
+    );
+  }
+
+  function updateUser(
+    index: number,
+    field: keyof UserType,
+    value: string
+  ) {
+    setAnalysis((current) => {
+      if (!current) return current;
+
+      const users = [...current.users];
+
+      users[index] = {
+        ...users[index],
+        [field]: value,
+      };
+
+      return {
+        ...current,
+        users,
+      };
+    });
+  }
+
+  function addUser() {
+    setAnalysis((current) => {
+      if (!current) return current;
+
+      return {
+        ...current,
+        users: [
+          ...current.users,
+          {
+            name: "New user",
+            description: "Describe what this user does.",
+          },
+        ],
+      };
+    });
+  }
+
+  function removeUser(index: number) {
+    setAnalysis((current) => {
+      if (!current) return current;
+
+      return {
+        ...current,
+        users: current.users.filter((_, userIndex) => userIndex !== index),
+      };
+    });
+  }
+
+  function updateFeature(index: number, value: string) {
+    setAnalysis((current) => {
+      if (!current) return current;
+
+      const features = [...current.features];
+      features[index] = value;
+
+      return {
+        ...current,
+        features,
+      };
+    });
+  }
+
+  function addFeature() {
+    setAnalysis((current) => {
+      if (!current) return current;
+
+      return {
+        ...current,
+        features: [...current.features, "New feature"],
+      };
+    });
+  }
+
+  function removeFeature(index: number) {
+    setAnalysis((current) => {
+      if (!current) return current;
+
+      return {
+        ...current,
+        features: current.features.filter(
+          (_, featureIndex) => featureIndex !== index
+        ),
+      };
+    });
+  }
+
+  function updateDataEntity(index: number, value: string) {
+    setAnalysis((current) => {
+      if (!current) return current;
+
+      const dataModel = [...current.dataModel];
+      dataModel[index] = value;
+
+      return {
+        ...current,
+        dataModel,
+      };
+    });
+  }
+
+  function addDataEntity() {
+    setAnalysis((current) => {
+      if (!current) return current;
+
+      return {
+        ...current,
+        dataModel: [...current.dataModel, "New entity"],
+      };
+    });
+  }
+
+  function removeDataEntity(index: number) {
+    setAnalysis((current) => {
+      if (!current) return current;
+
+      return {
+        ...current,
+        dataModel: current.dataModel.filter(
+          (_, entityIndex) => entityIndex !== index
+        ),
+      };
+    });
+  }
+
+  function toggleFoundation(field: keyof Foundation) {
+    setAnalysis((current) => {
+      if (!current) return current;
+
+      return {
+        ...current,
+        foundation: {
+          ...current.foundation,
+          [field]: !current.foundation[field],
+        },
+      };
+    });
+  }
+
+  function approvePlan() {
+    setEditing(false);
+    setApproved(true);
+  }
+
+  function startBuild() {
+  if (!analysis) return;
+
+  sessionStorage.setItem(
+    "abiora-approved-architecture",
+    JSON.stringify(analysis)
+  );
+
+  sessionStorage.setItem("abiora-build-status", "started");
+
+  window.location.href = "/builder";
+}
+
+
   if (loading) {
     return (
       <main className="architect-page">
         <header className="architect-topbar">
-          <a href="/" className="architect-brand">
+          <Link href="/" className="architect-brand">
             ABIORA
-          </a>
+          </Link>
 
           <div className="architect-progress">
             <span className="architect-progress-dot"></span>
             Analyzing product
           </div>
 
-          <a href="/" className="architect-exit">
+          <Link href="/" className="architect-exit">
             Exit
-          </a>
+          </Link>
         </header>
 
         <div className="architect-container">
@@ -126,18 +290,18 @@ export default function ArchitectPage() {
     return (
       <main className="architect-page">
         <header className="architect-topbar">
-          <a href="/" className="architect-brand">
+          <Link href="/" className="architect-brand">
             ABIORA
-          </a>
+          </Link>
 
           <div className="architect-progress">
             <span className="architect-progress-dot"></span>
             Analysis stopped
           </div>
 
-          <a href="/" className="architect-exit">
+          <Link href="/" className="architect-exit">
             Exit
-          </a>
+          </Link>
         </header>
 
         <div className="architect-container">
@@ -156,9 +320,9 @@ export default function ArchitectPage() {
             </div>
 
             <div className="architect-buttons">
-              <a href="/" className="edit-plan">
+              <Link href="/" className="edit-plan">
                 ← Return to workspace
-              </a>
+              </Link>
             </div>
           </div>
         </div>
@@ -166,63 +330,79 @@ export default function ArchitectPage() {
     );
   }
 
-  const foundationItems = [
+  const foundationItems: {
+    key: keyof Foundation;
+    label: string;
+  }[] = [
     {
+      key: "authentication",
       label: "Authentication",
-      enabled: analysis.foundation.authentication,
     },
     {
+      key: "database",
       label: "Database",
-      enabled: analysis.foundation.database,
     },
     {
+      key: "rolesAndPermissions",
       label: "Roles & permissions",
-      enabled: analysis.foundation.rolesAndPermissions,
     },
     {
+      key: "billing",
       label: "Subscription billing",
-      enabled: analysis.foundation.billing,
     },
     {
+      key: "email",
       label: "Email & notifications",
-      enabled: analysis.foundation.email,
     },
     {
+      key: "errorHandling",
       label: "Error handling",
-      enabled: analysis.foundation.errorHandling,
     },
     {
+      key: "testing",
       label: "Testing foundation",
-      enabled: analysis.foundation.testing,
     },
   ];
 
   return (
     <main className="architect-page">
       <header className="architect-topbar">
-        <a href="/" className="architect-brand">
+        <Link href="/" className="architect-brand">
           ABIORA
-        </a>
+        </Link>
 
         <div className="architect-progress">
           <span className="architect-progress-dot"></span>
-          Analysis complete
+          {approved
+            ? "Architecture approved"
+            : editing
+              ? "Review mode"
+              : "Analysis complete"}
         </div>
 
-        <a href="/" className="architect-exit">
+        <Link href="/" className="architect-exit">
           Exit
-        </a>
+        </Link>
       </header>
 
       <div className="architect-container">
         <section className="architect-intro">
           <p className="eyebrow">✦ ABIORA ARCHITECT</p>
 
-          <h1>I&apos;ve structured your idea.</h1>
+          <h1>
+            {approved
+              ? "Architecture approved."
+              : editing
+                ? "Refine the architecture."
+                : "I've structured your idea."}
+          </h1>
 
           <p>
-            Review the proposed product architecture before anything gets
-            built. Abiora has focused the plan around a strong, practical MVP.
+            {approved
+              ? "This specification is now ready to become the source of truth for the build."
+              : editing
+                ? "Review Abiora's decisions and change anything that does not match the product you want to build."
+                : "Review the proposed product architecture before anything gets built. Abiora has focused the plan around a strong, practical MVP."}
           </p>
         </section>
 
@@ -234,9 +414,31 @@ export default function ArchitectPage() {
                 <p>PRODUCT</p>
               </div>
 
-              <h2>{analysis.productName}</h2>
+              {editing ? (
+                <>
+                  <input
+                    className="architect-edit-title"
+                    value={analysis.productName}
+                    onChange={(event) =>
+                      updateProductName(event.target.value)
+                    }
+                  />
 
-              <p className="architect-description">{analysis.summary}</p>
+                  <textarea
+                    className="architect-edit-textarea"
+                    value={analysis.summary}
+                    onChange={(event) => updateSummary(event.target.value)}
+                  />
+                </>
+              ) : (
+                <>
+                  <h2>{analysis.productName}</h2>
+
+                  <p className="architect-description">
+                    {analysis.summary}
+                  </p>
+                </>
+              )}
             </section>
 
             <section className="architect-card">
@@ -247,12 +449,56 @@ export default function ArchitectPage() {
 
               <div className="architect-list">
                 {analysis.users.map((user, index) => (
-                  <div key={`${user.name}-${index}`}>
-                    <strong>{user.name}</strong>
-                    <p>{user.description}</p>
+                  <div key={index}>
+                    {editing ? (
+                      <div className="architect-edit-row">
+                        <div className="architect-edit-fields">
+                          <input
+                            value={user.name}
+                            onChange={(event) =>
+                              updateUser(index, "name", event.target.value)
+                            }
+                          />
+
+                          <textarea
+                            value={user.description}
+                            onChange={(event) =>
+                              updateUser(
+                                index,
+                                "description",
+                                event.target.value
+                              )
+                            }
+                          />
+                        </div>
+
+                        <button
+                          type="button"
+                          className="architect-remove"
+                          onClick={() => removeUser(index)}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <strong>{user.name}</strong>
+                        <p>{user.description}</p>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
+
+              {editing && (
+                <button
+                  type="button"
+                  className="architect-add"
+                  onClick={addUser}
+                >
+                  + Add user
+                </button>
+              )}
             </section>
 
             <section className="architect-card">
@@ -262,10 +508,38 @@ export default function ArchitectPage() {
               </div>
 
               <div className="feature-grid">
-                {analysis.features.map((feature, index) => (
-                  <span key={`${feature}-${index}`}>✓ {feature}</span>
-                ))}
+                {analysis.features.map((feature, index) =>
+                  editing ? (
+                    <div className="architect-edit-item" key={index}>
+                      <input
+                        value={feature}
+                        onChange={(event) =>
+                          updateFeature(index, event.target.value)
+                        }
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => removeFeature(index)}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ) : (
+                    <span key={index}>✓ {feature}</span>
+                  )
+                )}
               </div>
+
+              {editing && (
+                <button
+                  type="button"
+                  className="architect-add"
+                  onClick={addFeature}
+                >
+                  + Add feature
+                </button>
+              )}
             </section>
 
             <section className="architect-card">
@@ -278,11 +552,39 @@ export default function ArchitectPage() {
                 <div className="data-root">{analysis.productName}</div>
 
                 <div className="data-children">
-                  {analysis.dataModel.map((entity, index) => (
-                    <span key={`${entity}-${index}`}>{entity}</span>
-                  ))}
+                  {analysis.dataModel.map((entity, index) =>
+                    editing ? (
+                      <div className="architect-edit-item" key={index}>
+                        <input
+                          value={entity}
+                          onChange={(event) =>
+                            updateDataEntity(index, event.target.value)
+                          }
+                        />
+
+                        <button
+                          type="button"
+                          onClick={() => removeDataEntity(index)}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ) : (
+                      <span key={index}>{entity}</span>
+                    )
+                  )}
                 </div>
               </div>
+
+              {editing && (
+                <button
+                  type="button"
+                  className="architect-add"
+                  onClick={addDataEntity}
+                >
+                  + Add data entity
+                </button>
+              )}
             </section>
           </div>
 
@@ -295,26 +597,48 @@ export default function ArchitectPage() {
 
               <div className="foundation-list">
                 {foundationItems.map((item) => (
-                  <div key={item.label}>
+                  <div key={item.key}>
                     <span>{item.label}</span>
 
-                    <b>{item.enabled ? "✓ Required" : "Not needed"}</b>
+                    {editing ? (
+                      <button
+                        type="button"
+                        className={
+                          analysis.foundation[item.key]
+                            ? "foundation-toggle active"
+                            : "foundation-toggle"
+                        }
+                        onClick={() => toggleFoundation(item.key)}
+                      >
+                        {analysis.foundation[item.key]
+                          ? "Required"
+                          : "Not needed"}
+                      </button>
+                    ) : (
+                      <b>
+                        {analysis.foundation[item.key]
+                          ? "✓ Required"
+                          : "Not needed"}
+                      </b>
+                    )}
                   </div>
                 ))}
               </div>
             </section>
 
             <section className="architect-card recommendation-card">
-              <p className="recommendation-label">ABIORA RECOMMENDS</p>
+              <p className="recommendation-label">
+                ABIORA RECOMMENDS
+              </p>
 
               <h3>Product decisions</h3>
 
               <div className="recommendation-list">
-                {analysis.recommendations.map((recommendation, index) => (
-                  <span key={`${recommendation}-${index}`}>
-                    {recommendation}
-                  </span>
-                ))}
+                {analysis.recommendations.map(
+                  (recommendation, index) => (
+                    <span key={index}>{recommendation}</span>
+                  )
+                )}
               </div>
             </section>
           </aside>
@@ -322,18 +646,73 @@ export default function ArchitectPage() {
 
         <div className="architect-actions">
           <div>
-            <strong>Architecture ready for review</strong>
+            <strong>
+              {approved
+                ? "Specification approved"
+                : editing
+                  ? "Review mode active"
+                  : "Architecture ready for review"}
+            </strong>
+
             <span>
-              Review the MVP before moving into application generation.
+              {approved
+                ? "Abiora can now use this approved specification for the build."
+                : editing
+                  ? "Your changes will become part of the approved product specification."
+                  : "Review the MVP before moving into application generation."}
             </span>
           </div>
 
           <div className="architect-buttons">
-            <a href="/" className="edit-plan">
-              Edit Idea
-            </a>
+            {!approved && !editing && (
+              <>
+                <button
+                  type="button"
+                  className="edit-plan"
+                  onClick={() => setEditing(true)}
+                >
+                  Edit Plan
+                </button>
 
-            <button className="approve-build">Approve &amp; Build →</button>
+                <button
+                  type="button"
+                  className="approve-build"
+                  onClick={approvePlan}
+                >
+                  Approve Plan →
+                </button>
+              </>
+            )}
+
+            {!approved && editing && (
+              <>
+                <button
+                  type="button"
+                  className="edit-plan"
+                  onClick={() => setEditing(false)}
+                >
+                  Done Editing
+                </button>
+
+                <button
+                  type="button"
+                  className="approve-build"
+                  onClick={approvePlan}
+                >
+                  Approve Plan →
+                </button>
+              </>
+            )}
+
+            {approved && (
+              <button
+                type="button"
+                className="approve-build"
+                  onClick={startBuild}
+              >
+                Start Build →
+              </button>
+            )}
           </div>
         </div>
       </div>
