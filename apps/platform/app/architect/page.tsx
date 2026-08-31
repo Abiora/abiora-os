@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type {
   Analysis,
@@ -246,18 +247,18 @@ export default function ArchitectPage() {
     return (
       <main className="architect-page">
         <header className="architect-topbar">
-          <a href="/" className="architect-brand">
+          <Link href="/" className="architect-brand">
             ABIORA
-          </a>
+          </Link>
 
           <div className="architect-progress">
             <span className="architect-progress-dot"></span>
             Analyzing product
           </div>
 
-          <a href="/" className="architect-exit">
+          <Link href="/" className="architect-exit">
             Exit
-          </a>
+          </Link>
         </header>
 
         <div className="architect-container">
@@ -289,18 +290,18 @@ export default function ArchitectPage() {
     return (
       <main className="architect-page">
         <header className="architect-topbar">
-          <a href="/" className="architect-brand">
+          <Link href="/" className="architect-brand">
             ABIORA
-          </a>
+          </Link>
 
           <div className="architect-progress">
             <span className="architect-progress-dot"></span>
             Analysis stopped
           </div>
 
-          <a href="/" className="architect-exit">
+          <Link href="/" className="architect-exit">
             Exit
-          </a>
+          </Link>
         </header>
 
         <div className="architect-container">
@@ -319,9 +320,9 @@ export default function ArchitectPage() {
             </div>
 
             <div className="architect-buttons">
-              <a href="/" className="edit-plan">
+              <Link href="/" className="edit-plan">
                 ← Return to workspace
-              </a>
+              </Link>
             </div>
           </div>
         </div>
@@ -366,9 +367,9 @@ export default function ArchitectPage() {
   return (
     <main className="architect-page">
       <header className="architect-topbar">
-        <a href="/" className="architect-brand">
+        <Link href="/" className="architect-brand">
           ABIORA
-        </a>
+        </Link>
 
         <div className="architect-progress">
           <span className="architect-progress-dot"></span>
@@ -379,9 +380,9 @@ export default function ArchitectPage() {
               : "Analysis complete"}
         </div>
 
-        <a href="/" className="architect-exit">
+        <Link href="/" className="architect-exit">
           Exit
-        </a>
+        </Link>
       </header>
 
       <div className="architect-container">

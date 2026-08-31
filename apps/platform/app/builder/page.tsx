@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import type { Analysis } from "@/types/application";
 
 export default function BuilderPage() {
@@ -23,45 +24,41 @@ export default function BuilderPage() {
    * a build plan already exists.
    */
   useEffect(() => {
-    const storedArchitecture = sessionStorage.getItem(
-      "abiora-approved-architecture"
-    );
-
-    const storedBuildPlan = sessionStorage.getItem(
-      "abiora-build-plan"
-    );
-
-    if (storedBuildPlan) {
-      setHasBuildPlan(true);
-      setStatus("Build plan ready");
-    }
-
-    if (!storedArchitecture) {
-      setError(
-        "No approved architecture was found. Return to Architect and approve a plan first."
+    let statusTimer: number | undefined;
+    const frame = window.requestAnimationFrame(() => {
+      const storedArchitecture = sessionStorage.getItem(
+        "abiora-approved-architecture"
       );
-      return;
-    }
+      const storedBuildPlan = sessionStorage.getItem("abiora-build-plan");
 
-    try {
-      const parsed = JSON.parse(
-        storedArchitecture
-      ) as Analysis;
-
-      setArchitecture(parsed);
-
-      if (!storedBuildPlan) {
-        const timer = setTimeout(() => {
-          setStatus("Build specification ready");
-        }, 1200);
-
-        return () => clearTimeout(timer);
+      if (storedBuildPlan) {
+        setHasBuildPlan(true);
+        setStatus("Build plan ready");
       }
-    } catch {
-      setError(
-        "The approved architecture could not be loaded."
-      );
-    }
+
+      if (!storedArchitecture) {
+        setError(
+          "No approved architecture was found. Return to Architect and approve a plan first."
+        );
+        return;
+      }
+
+      try {
+        setArchitecture(JSON.parse(storedArchitecture) as Analysis);
+
+        if (!storedBuildPlan) {
+          statusTimer = window.setTimeout(() => {
+            setStatus("Build specification ready");
+          }, 1200);
+        }
+      } catch {
+        setError("The approved architecture could not be loaded.");
+      }
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      if (statusTimer) window.clearTimeout(statusTimer);
+    };
   }, []);
 
   /*
@@ -221,24 +218,24 @@ export default function BuilderPage() {
     return (
       <main className="architect-page">
         <header className="architect-topbar">
-          <a
+          <Link
             href="/"
             className="architect-brand"
           >
             ABIORA
-          </a>
+          </Link>
 
           <div className="architect-progress">
             <span className="architect-progress-dot"></span>
             Builder
           </div>
 
-          <a
+          <Link
             href="/"
             className="architect-exit"
           >
             Exit
-          </a>
+          </Link>
         </header>
 
         <div className="architect-container">
@@ -267,12 +264,12 @@ export default function BuilderPage() {
             </div>
 
             <div className="architect-buttons">
-              <a
+              <Link
                 href="/architect"
                 className="edit-plan"
               >
                 ← Architect
-              </a>
+              </Link>
             </div>
           </div>
         </div>
@@ -289,24 +286,24 @@ export default function BuilderPage() {
     return (
       <main className="architect-page">
         <header className="architect-topbar">
-          <a
+          <Link
             href="/"
             className="architect-brand"
           >
             ABIORA
-          </a>
+          </Link>
 
           <div className="architect-progress">
             <span className="architect-progress-dot"></span>
             Builder
           </div>
 
-          <a
+          <Link
             href="/"
             className="architect-exit"
           >
             Exit
-          </a>
+          </Link>
         </header>
 
         <div className="architect-container">
@@ -387,24 +384,24 @@ export default function BuilderPage() {
   return (
     <main className="architect-page">
       <header className="architect-topbar">
-        <a
+        <Link
           href="/"
           className="architect-brand"
         >
           ABIORA
-        </a>
+        </Link>
 
         <div className="architect-progress">
           <span className="architect-progress-dot"></span>
           Builder
         </div>
 
-        <a
+        <Link
           href="/"
           className="architect-exit"
         >
           Exit
-        </a>
+        </Link>
       </header>
 
       <div className="architect-container">
@@ -674,12 +671,12 @@ export default function BuilderPage() {
           </div>
 
           <div className="architect-buttons">
-            <a
+            <Link
               href="/architect"
               className="edit-plan"
             >
               ← Back to Architect
-            </a>
+            </Link>
 
             {!hasBuildPlan ? (
               <button
