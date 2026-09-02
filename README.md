@@ -1,3 +1,13 @@
+# Abiora OS
+
+## Generated application data
+
+Generated application blueprints remain in browser session storage for now. Their records are persisted in PostgreSQL through the generic `generated_records` table, keyed by an application identifier and entity name.
+
+1. Copy `apps/platform/.env.example` to `apps/platform/.env.local` and set `DATABASE_URL`. A Supabase PostgreSQL connection string works directly.
+2. Apply `apps/platform/db/migrations/001_generated_records.sql` using the database SQL editor or your migration runner.
+3. Run `pnpm dev`, generate an application, and its records will persist across refreshes.
+
 # Turborepo starter
 
 This Turborepo starter is maintained by the Turborepo core team.

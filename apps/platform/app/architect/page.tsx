@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type {
@@ -9,7 +9,7 @@ import type {
   UserType,
 } from "@/types/application";
 
-export default function ArchitectPage() {
+function ArchitectView() {
   const searchParams = useSearchParams();
   const idea = searchParams.get("idea") || "";
 
@@ -717,5 +717,13 @@ export default function ArchitectPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function ArchitectPage() {
+  return (
+    <Suspense fallback={null}>
+      <ArchitectView />
+    </Suspense>
   );
 }
