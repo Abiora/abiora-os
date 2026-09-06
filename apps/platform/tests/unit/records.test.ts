@@ -70,40 +70,75 @@ describe("entityForBlueprint", () => {
 });
 
 describe("validateRecordData", () => {
-  it("accepts valid data for editable fields", () => {
-    const result = validateRecordData(entity, { title: "Buy milk", done: true });
+  // None of `entity`'s fields are relation-shaped (no "*Id" field matching another
+  // entity's name), so these never reach the DB-backed relationship check below —
+  // they stay fast, hermetic unit tests. That check is covered by a live integration
+  // test in tests/integration/security.test.ts instead.
+  const noEntities: typeof blueprint.database = [];
+  const appId = "app_unit_test_only";
+
+  it("accepts valid data for editable fields", async () => {
+    const result = await validateRecordData(entity, noEntities, appId, { title: "Buy milk", done: true });
     expect(result).toEqual({ data: { title: "Buy milk", done: true } });
   });
 
-  it("rejects an unknown field", () => {
-    const result = validateRecordData(entity, { nope: "x" });
+  it("rejects an unknown field", async () => {
+    const result = await validateRecordData(entity, noEntities, appId, { nope: "x" });
     expect("error" in result && result.error).toMatch(/not writable/);
   });
 
-  it("rejects internal/blocked field names even when declared on the entity", () => {
-    const result = validateRecordData(entity, { id: "x" });
+  it("rejects internal/blocked field names even when declared on the entity", async () => {
+    const result = await validateRecordData(entity, noEntities, appId, { id: "x" });
     expect("error" in result && result.error).toMatch(/not writable/);
   });
 
-  it("rejects a non-primitive value", () => {
-    const result = validateRecordData(entity, { title: { nested: true } });
+  it("rejects a non-primitive value", async () => {
+    const result = await validateRecordData(entity, noEntities, appId, { title: { nested: true } });
     expect("error" in result && result.error).toMatch(/simple value/);
   });
 
-  it("rejects a non-finite numeric value", () => {
-    const result = validateRecordData(entity, { title: "x", done: Number.POSITIVE_INFINITY });
+  it("rejects a non-finite numeric value", async () => {
+    const result = await validateRecordData(entity, noEntities, appId, { title: "x", done: Number.POSITIVE_INFINITY });
     expect("error" in result && result.error).toMatch(/finite number/);
   });
 
-  it("rejects a missing required field", () => {
-    const result = validateRecordData(entity, { done: true });
+  it("rejects a missing required field", async () => {
+    const result = await validateRecordData(entity, noEntities, appId, { done: true });
     expect("error" in result && result.error).toMatch(/required/);
   });
 
-  it("rejects non-object input", () => {
-    expect("error" in validateRecordData(entity, null)).toBe(true);
-    expect("error" in validateRecordData(entity, ["x"])).toBe(true);
-    expect("error" in validateRecordData(entity, "x")).toBe(true);
+  it("rejects non-object input", async () => {
+    expect("error" in (await validateRecordData(entity, noEntities, appId, null))).toBe(true);
+    expect("error" in (await validateRecordData(entity, noEntities, appId, ["x"]))).toBe(true);
+    expect("error" in (await validateRecordData(entity, noEntities, appId, "x"))).toBe(true);
+  });
+
+  it("rejects a string value for a boolean-typed field", async () => {
+    const result = await validateRecordData(entity, noEntities, appId, { title: "x", done: "yes" });
+    expect("error" in result && result.error).toMatch(/must be a boolean/);
+  });
+
+  it("accepts a real boolean for a boolean-typed field", async () => {
+    const result = await validateRecordData(entity, noEntities, appId, { title: "x", done: false });
+    expect(result).toEqual({ data: { title: "x", done: false } });
+  });
+
+  it("rejects a string value for a number-typed field", async () => {
+    const numericEntity = { ...entity, fields: [...entity.fields, { name: "quantity", type: "number", required: false }] };
+    const result = await validateRecordData(numericEntity, noEntities, appId, { title: "x", quantity: "five" });
+    expect("error" in result && result.error).toMatch(/must be a number/);
+  });
+
+  it("accepts a real number for a number-typed field", async () => {
+    const numericEntity = { ...entity, fields: [...entity.fields, { name: "quantity", type: "number", required: false }] };
+    const result = await validateRecordData(numericEntity, noEntities, appId, { title: "x", quantity: 5 });
+    expect(result).toEqual({ data: { title: "x", quantity: 5 } });
+  });
+
+  it("does not enforce boolean/number type-checking when the field is left empty (optional, blank)", async () => {
+    const numericEntity = { ...entity, fields: [...entity.fields, { name: "quantity", type: "number", required: false }] };
+    const result = await validateRecordData(numericEntity, noEntities, appId, { title: "x", quantity: "" });
+    expect("error" in result).toBe(false);
   });
 });
 

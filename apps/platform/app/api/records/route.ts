@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     if (!blueprint) return Response.json({ error: "Application not found." }, { status: 404 });
     const entity = entityForBlueprint(blueprint, entityName);
     if (!entity) return Response.json({ error: "The entity is not available in this application." }, { status: 400 });
-    const validated = validateRecordData(entity, data);
+    const validated = await validateRecordData(entity, blueprint.database, applicationId, data);
     if ("error" in validated) return Response.json(validated, { status: 400 });
     const recordId = randomUUID();
     const result = await getDatabase().query<{ record_id: string; data: typeof validated.data }>("INSERT INTO generated_records (application_id, entity_name, record_id, data) VALUES ($1, $2, $3, $4::jsonb) RETURNING record_id, data", [applicationId, entity.name, recordId, JSON.stringify(validated.data)]);

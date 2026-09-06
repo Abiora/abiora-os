@@ -1,10 +1,26 @@
+import { getDatabase } from "@/lib/database";
 import type { ApplicationBlueprint } from "@/types/application";
 
 type Entity = ApplicationBlueprint["database"][number];
+type Field = Entity["fields"][number];
 export type RecordData = Record<string, string | number | boolean | null>;
 
 export const identifier = /^[a-zA-Z][a-zA-Z0-9_-]{0,99}$/;
 const internal = /(^|[_\s-])(id|uuid|createdat|updatedat|deletedat|password|passwordhash|hash|token|secret|apikey|salt)($|[_\s-])/i;
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const boolType = /bool/i;
+const numericType = /number|integer|decimal|float|double|currency|amount/i;
+
+// Mirrors app/generated/page.tsx's client-side relation() detection, so the
+// server validates the same fields the UI renders as relation dropdowns.
+const clean = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
+const singularize = (value: string) => {
+  const v = clean(value);
+  return v.endsWith("ies") ? `${v.slice(0, -3)}y` : v.endsWith("s") ? v.slice(0, -1) : v;
+};
+function relatedEntity(field: Field, entities: Entity[]): Entity | undefined {
+  return entities.find((entity) => singularize(entity.name) === singularize(field.name.replace(/_?id$/i, "")));
+}
 
 export function isApplicationId(value: unknown): value is string {
   return typeof value === "string" && /^app_[a-z0-9_-]{1,180}$/i.test(value);
@@ -41,17 +57,42 @@ function hasValue(value: unknown) {
   return typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value)) || (typeof value === "string" && value.trim().length > 0);
 }
 
-export function validateRecordData(entity: Entity, input: unknown): { data: RecordData } | { error: string } {
+/** Only checks the two type/field patterns actually rendered as typed inputs client-side (checkbox, number); other declared types (string, date, email, ...) accept any primitive, unchanged. */
+function checkFieldType(field: Field, value: unknown): string | null {
+  if (boolType.test(field.type) && typeof value !== "boolean") return `Field \"${field.name}\" must be a boolean.`;
+  if (numericType.test(field.type) && typeof value !== "number") return `Field \"${field.name}\" must be a number.`;
+  return null;
+}
+
+async function recordExists(applicationId: string, entityName: string, recordId: string): Promise<boolean> {
+  if (!uuid.test(recordId)) return false;
+  const result = await getDatabase().query("SELECT 1 FROM generated_records WHERE application_id = $1 AND entity_name = $2 AND record_id = $3 LIMIT 1", [applicationId, entityName, recordId]);
+  return (result.rowCount ?? 0) > 0;
+}
+
+export async function validateRecordData(entity: Entity, entities: Entity[], applicationId: string, input: unknown): Promise<{ data: RecordData } | { error: string }> {
   if (!input || typeof input !== "object" || Array.isArray(input)) return { error: "Record data must be an object." };
   const data = input as Record<string, unknown>;
   const allowed = new Map(editableFields(entity).map((field) => [field.name, field]));
   for (const [name, value] of Object.entries(data)) {
-    if (!allowed.has(name)) return { error: `Field \"${name}\" is not writable for this entity.` };
+    const field = allowed.get(name);
+    if (!field) return { error: `Field \"${name}\" is not writable for this entity.` };
     if (value !== null && typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") return { error: `Field \"${name}\" must be a simple value.` };
     if (typeof value === "number" && !Number.isFinite(value)) return { error: `Field \"${name}\" must be a finite number.` };
+    if (hasValue(value)) {
+      const typeError = checkFieldType(field, value);
+      if (typeError) return { error: typeError };
+    }
   }
   for (const field of allowed.values()) {
     if (field.required && !hasValue(data[field.name])) return { error: `Field \"${field.name}\" is required.` };
+  }
+  for (const [name, value] of Object.entries(data)) {
+    if (!hasValue(value)) continue;
+    const field = allowed.get(name)!;
+    const related = relatedEntity(field, entities);
+    if (!related) continue;
+    if (!(await recordExists(applicationId, related.name, String(value)))) return { error: `Field \"${name}\" refers to a ${related.name} record that does not exist.` };
   }
   return { data: Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined)) as RecordData };
 }
