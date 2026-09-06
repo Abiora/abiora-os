@@ -5,8 +5,14 @@
 const fs = require("fs");
 const path = require("path");
 const { Pool } = require("pg");
+const { assertEnvironmentMatches } = require("./environment-guard");
 
 const migrationsDir = path.join(__dirname, "migrations");
+
+function parseTarget(argv) {
+  const arg = argv.find((value) => value.startsWith("--target="));
+  return arg ? arg.slice("--target=".length) : null;
+}
 
 async function ensureMigrationsTable(pool) {
   await pool.query(`
@@ -50,6 +56,10 @@ async function main() {
   if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL is not set in the environment.");
   }
+
+  const target = parseTarget(process.argv.slice(2));
+  assertEnvironmentMatches(target, process.env.DATABASE_URL);
+  console.log(`Target "${target}" verified against DATABASE_URL's project ref. Proceeding.`);
 
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,

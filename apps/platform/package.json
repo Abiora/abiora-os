@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "migrate": "node db/migrate.js",
+    "migrate:staging": "node --env-file-if-exists=.env.staging.local db/migrate.js --target=staging",
+    "migrate:production": "node --env-file-if-exists=.env.production.local db/migrate.js --target=production",
     "test": "vitest run"
   },
   "dependencies": {
