@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { safeNextPath } from "@/lib/safe-redirect";
 
 function SignupForm() {
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") || "/";
+  const next = safeNextPath(searchParams.get("next"));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");

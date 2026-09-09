@@ -498,6 +498,80 @@ a {
   font-size: 14px;
 }
 
+.state-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--background);
+  color: var(--text);
+  text-align: center;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.state-card {
+  max-width: 440px;
+}
+
+.state-eyebrow {
+  color: var(--accent);
+  letter-spacing: 3px;
+  font-size: 12px;
+  font-weight: 800;
+  margin: 0 0 12px;
+}
+
+.state-card h1 {
+  margin: 0 0 12px;
+  font-size: 28px;
+  letter-spacing: -0.5px;
+}
+
+.state-card p {
+  margin: 0 0 28px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.state-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.state-primary,
+.state-secondary {
+  border-radius: 9px;
+  padding: 12px 20px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  font: inherit;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.state-primary {
+  border: 1px solid #fff;
+  background: #f5f5f7;
+  color: #090909;
+}
+
+.state-primary:hover {
+  background: #fff;
+}
+
+.state-secondary {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+}
+
+.state-secondary:hover {
+  border-color: var(--border-hover);
+}
+
 .green-dot {
   background: #6ad49a;
 }
