@@ -1,5 +1,9 @@
 import OpenAI from "openai";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
+import { rateLimitResponse } from "@/lib/rate-limit";
+import { validateArchitecture } from "@/lib/ai-validation";
+
+export const runtime = "nodejs";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -10,16 +14,19 @@ export async function POST(request: Request) {
     const user = await getAuthenticatedUser();
     if (!user) return Response.json({ error: "Authentication is required." }, { status: 401 });
 
-    const body = await request.json();
+    const limited = rateLimitResponse("generateBuild", user.id);
+    if (limited) return limited;
 
-    if (!body?.architecture) {
-      return Response.json(
-        { error: "Architecture is required." },
-        { status: 400 }
-      );
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return Response.json({ error: "Request body must be valid JSON." }, { status: 400 });
     }
 
-    const architecture = body.architecture;
+    const validated = validateArchitecture(body?.architecture);
+    if ("error" in validated) return Response.json(validated, { status: 400 });
+    const { architecture, json: architectureJson } = validated;
 
     const response = await openai.responses.create({
       model: "gpt-5.6",
@@ -63,7 +70,7 @@ Return JSON only.
         },
         {
           role: "user",
-          content: JSON.stringify(architecture),
+          content: architectureJson,
         },
       ],
     });
@@ -82,9 +89,11 @@ Return JSON only.
     try {
       buildPlan = JSON.parse(text);
     } catch {
-      buildPlan = {
-        overview: text,
-      };
+      console.error("Generate build error: AI returned non-JSON output");
+      return Response.json(
+        { error: "Abiora could not generate a valid build plan. Please try again." },
+        { status: 500 }
+      );
     }
 
     /*

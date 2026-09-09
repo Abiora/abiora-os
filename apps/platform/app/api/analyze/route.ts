@@ -1,6 +1,10 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
+import { rateLimitResponse } from "@/lib/rate-limit";
+import { validateIdea } from "@/lib/ai-validation";
+
+export const runtime = "nodejs";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -11,15 +15,19 @@ export async function POST(request: Request) {
     const user = await getAuthenticatedUser();
     if (!user) return NextResponse.json({ error: "Authentication is required." }, { status: 401 });
 
-    const body = await request.json();
-    const idea = body.idea?.trim();
+    const limited = rateLimitResponse("analyze", user.id);
+    if (limited) return limited;
 
-    if (!idea) {
-      return NextResponse.json(
-        { error: "A product idea is required." },
-        { status: 400 }
-      );
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Request body must be valid JSON." }, { status: 400 });
     }
+
+    const validated = validateIdea(body?.idea);
+    if ("error" in validated) return NextResponse.json(validated, { status: 400 });
+    const { idea } = validated;
 
     const response = await openai.responses.create({
       model: "gpt-5.4-mini",

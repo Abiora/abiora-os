@@ -1,6 +1,10 @@
 import OpenAI from "openai";
 import type { ApplicationBlueprint } from "@/types/application";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
+import { rateLimitResponse } from "@/lib/rate-limit";
+import { validateBuildPlan } from "@/lib/ai-validation";
+
+export const runtime = "nodejs";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -11,14 +15,19 @@ export async function POST(request: Request) {
     const user = await getAuthenticatedUser();
     if (!user) return Response.json({ error: "Authentication is required." }, { status: 401 });
 
-    const body = await request.json();
+    const limited = rateLimitResponse("generateApp", user.id);
+    if (limited) return limited;
 
-    if (!body?.buildPlan) {
-      return Response.json(
-        { error: "Build plan is required." },
-        { status: 400 }
-      );
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return Response.json({ error: "Request body must be valid JSON." }, { status: 400 });
     }
+
+    const validated = validateBuildPlan(body?.buildPlan);
+    if ("error" in validated) return Response.json(validated, { status: 400 });
+    const { buildPlan, json: buildPlanJson } = validated;
 
     const response = await openai.responses.create({
       model: "gpt-5.6",
@@ -147,7 +156,7 @@ IMPORTANT:
 
 Approved build plan:
 
-${JSON.stringify(body.buildPlan)}
+${buildPlanJson}
           `.trim(),
         },
       ],
@@ -167,11 +176,9 @@ ${JSON.stringify(body.buildPlan)}
     try {
       application = JSON.parse(text) as ApplicationBlueprint;
     } catch {
+      console.error("Generate application error: AI returned non-JSON output");
       return Response.json(
-        {
-          error: "AI returned invalid application JSON.",
-          raw: text,
-        },
+        { error: "Abiora could not generate a valid application. Please try again." },
         { status: 500 }
       );
     }
@@ -180,11 +187,8 @@ ${JSON.stringify(body.buildPlan)}
      * The approved build plan remains authoritative
      * for the product name.
      */
-    if (
-      body.buildPlan?.productName &&
-      application.projectName !== body.buildPlan.productName
-    ) {
-      application.projectName = body.buildPlan.productName;
+    if (application.projectName !== buildPlan.productName) {
+      application.projectName = buildPlan.productName as string;
     }
 
     return Response.json({
