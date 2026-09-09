@@ -366,17 +366,6 @@ a {
   letter-spacing: -1px;
 }
 
-.view-button {
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-.view-button:hover {
-  color: white;
-}
-
 .projects-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -459,11 +448,6 @@ a {
   font-weight: 800;
 }
 
-.project-menu {
-  color: #656a79;
-  letter-spacing: 2px;
-}
-
 .project-meta {
   padding-top: 17px;
   border-top: 1px solid #1e202b;
@@ -481,12 +465,37 @@ a {
   gap: 7px;
 }
 
-.green-dot,
-.blue-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  display: inline-block;
+.project-card-loading {
+  min-height: 245px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+  opacity: 0.5;
+}
+
+.projects-error {
+  margin-bottom: 16px;
+  padding: 13px 16px;
+  border-radius: 9px;
+  background: rgba(255, 90, 100, 0.08);
+  border: 1px solid rgba(255, 90, 100, 0.3);
+  color: #ff9aa2;
+  font-size: 13px;
+}
+
+.projects-empty {
+  margin-top: 16px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.dashboard-loading {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: var(--background);
+  color: var(--muted);
+  font-size: 14px;
 }
 
 .green-dot {

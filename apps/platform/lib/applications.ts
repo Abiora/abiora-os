@@ -74,3 +74,19 @@ export async function getApplicationBlueprint(applicationId: string, ownerId: st
   const result = await getDatabase().query<{ blueprint: ApplicationBlueprint }>("SELECT blueprint FROM applications WHERE id = $1 AND owner_id = $2", [applicationId, ownerId]);
   return result.rows[0]?.blueprint ?? null;
 }
+
+export type ApplicationSummary = {
+  id: string;
+  projectName: string;
+  description: string;
+  createdAt: string;
+};
+
+/** Lightweight summaries (not full blueprints) for listing an owner's applications, newest first. */
+export async function listApplications(ownerId: string): Promise<ApplicationSummary[]> {
+  const result = await getDatabase().query<{ id: string; project_name: string; description: string; created_at: string }>(
+    "SELECT id, blueprint->>'projectName' AS project_name, blueprint->>'description' AS description, created_at FROM applications WHERE owner_id = $1 ORDER BY created_at DESC",
+    [ownerId]
+  );
+  return result.rows.map((row) => ({ id: row.id, projectName: row.project_name, description: row.description, createdAt: row.created_at }));
+}

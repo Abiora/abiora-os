@@ -1,9 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 import type { Analysis } from "@/types/application";
 
 export default function BuilderPage() {
+  const [authState, setAuthState] =
+    useState<"checking" | "authenticated" | "unauthenticated">("checking");
+
   const [architecture, setArchitecture] =
     useState<Analysis | null>(null);
 
@@ -20,10 +24,28 @@ export default function BuilderPage() {
     useState(false);
 
   /*
+   * Require an authenticated session before touching the build pipeline.
+   */
+  useEffect(() => {
+    let cancelled = false;
+    createClient().auth.getUser().then(({ data }) => {
+      if (cancelled) return;
+      if (data.user) {
+        setAuthState("authenticated");
+      } else {
+        setAuthState("unauthenticated");
+        window.location.href = `/login?next=${encodeURIComponent("/builder")}`;
+      }
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  /*
    * Load the approved architecture and check whether
    * a build plan already exists.
    */
   useEffect(() => {
+    if (authState !== "authenticated") return;
     let statusTimer: number | undefined;
     const frame = window.requestAnimationFrame(() => {
       const storedArchitecture = sessionStorage.getItem(
@@ -59,7 +81,7 @@ export default function BuilderPage() {
       window.cancelAnimationFrame(frame);
       if (statusTimer) window.clearTimeout(statusTimer);
     };
-  }, []);
+  }, [authState]);
 
   /*
    * Step 1:

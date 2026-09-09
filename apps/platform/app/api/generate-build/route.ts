@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { getAuthenticatedUser } from "@/lib/supabase/server";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -6,6 +7,9 @@ const openai = new OpenAI({
 
 export async function POST(request: Request) {
   try {
+    const user = await getAuthenticatedUser();
+    if (!user) return Response.json({ error: "Authentication is required." }, { status: 401 });
+
     const body = await request.json();
 
     if (!body?.architecture) {

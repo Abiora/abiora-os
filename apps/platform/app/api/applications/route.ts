@@ -1,7 +1,19 @@
-import { createApplication, validateBlueprint } from "@/lib/applications";
+import { createApplication, listApplications, validateBlueprint } from "@/lib/applications";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
+
+export async function GET() {
+  try {
+    const user = await getAuthenticatedUser();
+    if (!user) return Response.json({ error: "Authentication is required." }, { status: 401 });
+    const applications = await listApplications(user.id);
+    return Response.json({ applications });
+  } catch (error) {
+    console.error("List applications error:", error);
+    return Response.json({ error: "Could not load applications." }, { status: 500 });
+  }
+}
 
 export async function POST(request: Request) {
   try {

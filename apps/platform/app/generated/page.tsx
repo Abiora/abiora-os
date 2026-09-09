@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { ApplicationBlueprint } from "@/types/application";
 
@@ -66,11 +68,14 @@ function readCachedApplicationId(raw: string) {
   }
 }
 
-export default function GeneratedApp() {
+function GeneratedAppView() {
+  const searchParams = useSearchParams();
+  const urlApplicationId = searchParams.get("applicationId") || "";
+
   const [authState, setAuthState] = useState<"checking" | "authenticated" | "unauthenticated">("checking");
   const [application, setApplication] = useState<ApplicationBlueprint | null>(null);
   const [rawBlueprint, setRawBlueprint] = useState("");
-  const [registeredApplicationId, setRegisteredApplicationId] = useState("");
+  const [registeredApplicationId, setRegisteredApplicationId] = useState(urlApplicationId);
   const [hasLoadedBlueprint, setHasLoadedBlueprint] = useState(false);
   const [activePage, setActivePage] = useState("");
   const [records, setRecords] = useState<Records>({});
@@ -89,14 +94,40 @@ export default function GeneratedApp() {
         setAuthState("authenticated");
       } else {
         setAuthState("unauthenticated");
-        window.location.href = `/login?next=${encodeURIComponent("/generated")}`;
+        const next = urlApplicationId ? `/generated?applicationId=${encodeURIComponent(urlApplicationId)}` : "/generated";
+        window.location.href = `/login?next=${encodeURIComponent(next)}`;
       }
     });
     return () => { cancelled = true; };
-  }, []);
+  }, [urlApplicationId]);
 
   useEffect(() => {
     if (authState !== "authenticated") return;
+
+    if (urlApplicationId) {
+      let cancelled = false;
+      fetch(`/api/applications/${encodeURIComponent(urlApplicationId)}`)
+        .then(async (response) => {
+          const body = await readJson(response);
+          if (!response.ok || !body?.application) throw new Error(body?.error || "Could not load this application.");
+          if (cancelled) return;
+          const blueprint = body.application as ApplicationBlueprint;
+          setApplication(blueprint);
+          setRawBlueprint(JSON.stringify(blueprint));
+          setActivePage(blueprint.pages[0]?.name ?? "");
+          setRecords(Object.fromEntries(blueprint.database.map((entity) => [entity.name, []])));
+        })
+        .catch((error) => {
+          if (cancelled) return;
+          console.error("Load application error:", error);
+          setRecordsError(error instanceof Error ? error.message : "Could not load this application.");
+        })
+        .finally(() => {
+          if (!cancelled) setHasLoadedBlueprint(true);
+        });
+      return () => { cancelled = true; };
+    }
+
     const frame = window.requestAnimationFrame(() => {
       const loaded = readBlueprint();
       if (loaded) {
@@ -108,13 +139,16 @@ export default function GeneratedApp() {
       setHasLoadedBlueprint(true);
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [authState]);
+  }, [authState, urlApplicationId]);
 
   const cachedApplicationId = useMemo(() => (rawBlueprint ? readCachedApplicationId(rawBlueprint) : ""), [rawBlueprint]);
   const applicationId = cachedApplicationId || registeredApplicationId;
 
   useEffect(() => {
-    if (!application || !rawBlueprint || cachedApplicationId) return;
+    // An application opened via ?applicationId= is already persisted; only
+    // freshly-generated blueprints (from the builder, via sessionStorage)
+    // need to be registered here.
+    if (urlApplicationId || !application || !rawBlueprint || cachedApplicationId) return;
     let cancelled = false;
     fetch("/api/applications", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ blueprint: application }) })
       .then(async (response) => {
@@ -130,7 +164,7 @@ export default function GeneratedApp() {
         setRecordsError(error instanceof Error ? error.message : "Could not register this application.");
       });
     return () => { cancelled = true; };
-  }, [application, rawBlueprint, cachedApplicationId]);
+  }, [application, rawBlueprint, cachedApplicationId, urlApplicationId]);
 
   useEffect(() => {
     if (!application || !applicationId) return;
@@ -206,7 +240,15 @@ export default function GeneratedApp() {
   if (authState === "checking" || authState === "unauthenticated") return <main className="app"><section className="empty"><p>Generated application</p><h1>{authState === "checking" ? "Checking your session…" : "Redirecting to log in…"}</h1></section><Styles /></main>;
   if (!hasLoadedBlueprint) return <main className="app"><section className="empty"><p>Generated application</p><h1>Loading your application…</h1><span>Preparing the generated workspace.</span></section><Styles /></main>;
   if (!application) return <main className="app"><section className="empty"><p>Generated application</p><h1>No application is ready yet.</h1><span>Generate an application from the builder to preview it here.</span></section><Styles /></main>;
-  return <main className="app"><aside><strong>✦ {application.projectName}</strong><nav>{application.pages.map((item, index) => <button className={page?.name === item.name ? "active" : ""} key={`${item.path}-${item.name}`} onClick={() => { setActivePage(item.name); setQuery(""); }}><i>{index + 1}</i>{item.name}</button>)}</nav><small>{application.database.length} data entities<br />Generated by Abiora<br /><button className="logout" onClick={logout}>Log out</button></small></aside><section className="main"><header><div><p>{application.projectName}</p><h1>{page?.name}</h1></div>{application.database[0] && <button className="primary" onClick={() => open(application.database[0].name)}>+ New record</button>}</header><article>{recordsError && <div className="banner">{recordsError}</div>}<p className="purpose">{page?.purpose || application.description}</p>{page?.components.map((component, index) => <Component key={`${component.name}-${index}`} component={component} application={application} records={records} query={query} setQuery={setQuery} open={open} select={(entity, record) => setSelected({ entity, record })} remove={remove} />)}</article></section>{editing && <Editor entity={entityMap.get(editing.entity)!} entities={application.database} records={records} values={values} isEditing={Boolean(editing.record)} saving={saving} change={(name, value) => setValues((current) => ({ ...current, [name]: value }))} cancel={() => setEditing(null)} save={save} />}{selected && <Detail entity={entityMap.get(selected.entity)!} record={selected.record} application={application} records={records} close={() => setSelected(null)} edit={() => open(selected.entity, selected.record)} remove={() => remove(selected.entity, selected.record.__id)} />}<Styles /></main>;
+  return <main className="app"><aside><strong>✦ {application.projectName}</strong><Link href="/" className="back-link">← Dashboard</Link><nav>{application.pages.map((item, index) => <button className={page?.name === item.name ? "active" : ""} key={`${item.path}-${item.name}`} onClick={() => { setActivePage(item.name); setQuery(""); }}><i>{index + 1}</i>{item.name}</button>)}</nav><small>{application.database.length} data entities<br />Generated by Abiora<br /><button className="logout" onClick={logout}>Log out</button></small></aside><section className="main"><header><div><p>{application.projectName}</p><h1>{page?.name}</h1></div>{application.database[0] && <button className="primary" onClick={() => open(application.database[0].name)}>+ New record</button>}</header><article>{recordsError && <div className="banner">{recordsError}</div>}<p className="purpose">{page?.purpose || application.description}</p>{page?.components.map((component, index) => <Component key={`${component.name}-${index}`} component={component} application={application} records={records} query={query} setQuery={setQuery} open={open} select={(entity, record) => setSelected({ entity, record })} remove={remove} />)}</article></section>{editing && <Editor entity={entityMap.get(editing.entity)!} entities={application.database} records={records} values={values} isEditing={Boolean(editing.record)} saving={saving} change={(name, value) => setValues((current) => ({ ...current, [name]: value }))} cancel={() => setEditing(null)} save={save} />}{selected && <Detail entity={entityMap.get(selected.entity)!} record={selected.record} application={application} records={records} close={() => setSelected(null)} edit={() => open(selected.entity, selected.record)} remove={() => remove(selected.entity, selected.record.__id)} />}<Styles /></main>;
+}
+
+export default function GeneratedApp() {
+  return (
+    <Suspense fallback={null}>
+      <GeneratedAppView />
+    </Suspense>
+  );
 }
 
 function Component({ component, application, records, query, setQuery, open, select, remove }: { component: ApplicationBlueprint["pages"][number]["components"][number]; application: ApplicationBlueprint; records: Records; query: string; setQuery: (value: string) => void; open: (entity: string, record?: RecordItem) => void; select: (entity: string, record: RecordItem) => void; remove: (entity: string, id: string) => void }) {
@@ -227,4 +269,4 @@ function Editor({ entity, entities, records, values, isEditing, saving, change, 
 
 function Detail({ entity, record, application, records, close, edit, remove }: { entity: Entity; record: RecordItem; application: ApplicationBlueprint; records: Records; close: () => void; edit: () => void; remove: () => void }) { const children = application.database.flatMap((child) => fields(child).map((field) => ({ child, field })).filter(({ field }) => relation(field, application.database)?.name === entity.name).map(({ child, field }) => ({ name: child.name, count: (records[child.name] ?? []).filter((item) => String(item[field.name]) === record.__id).length }))).filter((item) => item.count); return <aside className="detail"><button className="x" onClick={close}>×</button><p>{label(entity.name)}</p><h2>{recordLabel(record, entity)}</h2><dl>{fields(entity).map((field) => <div key={field.name}><dt>{label(field.name)}</dt><dd>{display(record[field.name])}</dd></div>)}</dl>{children.length > 0 && <section className="related"><p>Related records</p>{children.map((child) => <div key={child.name}>{child.count} {label(child.name)}</div>)}</section>}<footer><button onClick={edit}>Edit</button><button className="danger" onClick={remove}>Delete</button></footer></aside>; }
 
-function Styles() { return <style jsx global>{`.app{min-height:100vh;background:#f7f8fc;color:#172238;display:grid;grid-template-columns:245px 1fr;font-family:Arial,Helvetica,sans-serif}.app>aside:not(.detail){min-height:100vh;padding:28px 16px;background:#101a2d;color:#dbe4f5;display:flex;flex-direction:column;gap:35px}.app>aside strong{padding:0 10px}.app nav{display:grid;gap:5px}.app nav button{padding:12px 10px;border:0;border-radius:8px;background:transparent;color:#acb9d2;text-align:left;cursor:pointer}.app nav button.active,.app nav button:hover{background:#253452;color:white}.app nav i{font-style:normal;font-size:10px;margin-right:10px;color:#8291ae}.app>aside small{margin-top:auto;padding:13px 10px;border-top:1px solid #2c3954;color:#95a3bd;line-height:1.8}.app>aside small .logout{margin-top:8px;border:1px solid #2c3954;background:transparent;color:#dbe4f5;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px}.app>aside small .logout:hover{background:#253452}.main header{padding:30px clamp(24px,5vw,70px);background:#fff;border-bottom:1px solid #e2e7f0;display:flex;align-items:center;justify-content:space-between;gap:16px}.main header p,.card>p,.stat p,.modal>p,.detail>p,.related>p{margin:0;color:#6474a4;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;font-weight:700}.main h1{margin:5px 0 0;font-size:29px}.main article{max-width:1200px;margin:auto;padding:36px clamp(24px,5vw,70px);display:grid;gap:20px}.purpose{margin:0;color:#5e6b80;line-height:1.6}.banner{padding:13px 16px;border-radius:9px;background:#fff1f2;border:1px solid #ffc9cf;color:#8a2632;font-size:13px}.card,.stat,.empty{background:white;border:1px solid #e1e6ef;border-radius:14px;box-shadow:0 8px 25px #25375a0a}.card{padding:24px}.card h2{margin:6px 0;font-size:20px}.card span{color:#65728a}.stat{padding:22px}.stat b{display:block;margin:9px 0 4px;font-size:34px}.stat span{font-size:12px;color:#75829a}.heading{display:flex;justify-content:space-between;gap:12px;margin-bottom:18px}.heading h2{margin:5px 0 0}.heading button,.card button:not(.primary),footer button{border:1px solid #d7deea;background:#fff;border-radius:8px;padding:8px 11px;color:#37445b;font-weight:700;cursor:pointer}.primary{border:1px solid #596ae6!important;background:#596ae6!important;color:#fff!important;border-radius:8px;padding:10px 14px;font-weight:700;cursor:pointer}.card input,.form input:not([type=checkbox]),.form select,.form textarea{width:100%;border:1px solid #dce2ed;border-radius:8px;padding:10px 11px;outline:none;font:inherit;color:#293650}.card>input{margin-bottom:16px}.table{overflow:auto}.table table{width:100%;border-collapse:collapse;font-size:13px}.table th{text-align:left;padding:0 12px 11px;color:#77849b;font-size:11px;text-transform:uppercase}.table td{border-top:1px solid #edf0f5;padding:14px 12px;color:#344159;white-space:nowrap}.table tbody tr{cursor:pointer}.table tbody tr:hover{background:#fafbff}.table td button{border:0;background:transparent;color:#50617d;cursor:pointer;margin-right:8px}.table td .delete{color:#be3e4f}.empty{max-width:560px;min-height:300px;margin:auto;padding:45px;text-align:center;display:grid;place-content:center;gap:10px}.empty h1{margin:0;font-size:27px}.empty span{color:#728099;line-height:1.5}.empty.mini{max-width:none;min-height:175px;box-shadow:none;border:0}.empty.mini b{font-size:16px}.empty.mini .primary{margin:8px auto 0}.action{display:flex;align-items:center;justify-content:space-between;gap:20px}.insight{margin-top:18px;padding:20px;background:#f3f6fb;border-radius:9px;color:#66738a;line-height:1.6}.veil{position:fixed;inset:0;z-index:20;background:#101a2d70;display:grid;place-items:center;padding:20px}.modal{position:relative;width:min(650px,100%);max-height:90vh;overflow:auto;padding:24px;background:#fff;border-radius:15px;box-shadow:0 28px 80px #17223850}.modal h2{margin:6px 0 23px}.x{border:0;background:transparent;color:#68758b;font-size:27px;line-height:1;cursor:pointer}.modal>.x,.detail>.x{position:absolute;right:20px;top:20px}.form{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}.form label{display:grid;gap:7px;font-size:13px;font-weight:700;color:#4a5870}.form label b{color:#ce4151}.form textarea{min-height:92px;resize:vertical}.form input[type=checkbox]{width:18px;height:18px;margin:5px 0}footer{display:flex;justify-content:flex-end;gap:10px;margin-top:24px}.detail{position:fixed;z-index:15;right:0;top:0;bottom:0;width:min(430px,100%);overflow:auto;background:#fff;padding:32px;box-shadow:-10px 0 36px #17223824}.detail h2{margin:6px 30px 25px 0;font-size:27px}.detail dl{margin:0}.detail dl div{padding:13px 0;border-top:1px solid #edf0f5}.detail dt{color:#77849a;font-size:11px;text-transform:uppercase}.detail dd{margin:5px 0 0;color:#344159}.related{margin-top:22px;padding-top:18px;border-top:1px solid #edf0f5;color:#52617a}.related div{padding:7px 0}.danger{color:#b52c3d!important;border-color:#ffc9cf!important;background:#fff1f2!important}@media(max-width:720px){.app{display:block}.app>aside:not(.detail){min-height:auto;padding:16px;gap:15px}.app nav{display:flex;overflow:auto}.app nav button{white-space:nowrap}.app>aside small{display:none}.main header{padding:22px 20px}.main article{padding:26px 20px}.main h1{font-size:24px}.form{grid-template-columns:1fr}.action{align-items:flex-start;flex-direction:column}.table th:nth-child(n+4),.table td:nth-child(n+4){display:none}}`}</style>; }
+function Styles() { return <style jsx global>{`.app{min-height:100vh;background:#f7f8fc;color:#172238;display:grid;grid-template-columns:245px 1fr;font-family:Arial,Helvetica,sans-serif}.app>aside:not(.detail){min-height:100vh;padding:28px 16px;background:#101a2d;color:#dbe4f5;display:flex;flex-direction:column;gap:35px}.app>aside strong{padding:0 10px}.app>aside .back-link{display:block;padding:10px 10px 0;color:#8291ae;font-size:12px;text-decoration:none}.app>aside .back-link:hover{color:#dbe4f5}.app nav{display:grid;gap:5px}.app nav button{padding:12px 10px;border:0;border-radius:8px;background:transparent;color:#acb9d2;text-align:left;cursor:pointer}.app nav button.active,.app nav button:hover{background:#253452;color:white}.app nav i{font-style:normal;font-size:10px;margin-right:10px;color:#8291ae}.app>aside small{margin-top:auto;padding:13px 10px;border-top:1px solid #2c3954;color:#95a3bd;line-height:1.8}.app>aside small .logout{margin-top:8px;border:1px solid #2c3954;background:transparent;color:#dbe4f5;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px}.app>aside small .logout:hover{background:#253452}.main header{padding:30px clamp(24px,5vw,70px);background:#fff;border-bottom:1px solid #e2e7f0;display:flex;align-items:center;justify-content:space-between;gap:16px}.main header p,.card>p,.stat p,.modal>p,.detail>p,.related>p{margin:0;color:#6474a4;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;font-weight:700}.main h1{margin:5px 0 0;font-size:29px}.main article{max-width:1200px;margin:auto;padding:36px clamp(24px,5vw,70px);display:grid;gap:20px}.purpose{margin:0;color:#5e6b80;line-height:1.6}.banner{padding:13px 16px;border-radius:9px;background:#fff1f2;border:1px solid #ffc9cf;color:#8a2632;font-size:13px}.card,.stat,.empty{background:white;border:1px solid #e1e6ef;border-radius:14px;box-shadow:0 8px 25px #25375a0a}.card{padding:24px}.card h2{margin:6px 0;font-size:20px}.card span{color:#65728a}.stat{padding:22px}.stat b{display:block;margin:9px 0 4px;font-size:34px}.stat span{font-size:12px;color:#75829a}.heading{display:flex;justify-content:space-between;gap:12px;margin-bottom:18px}.heading h2{margin:5px 0 0}.heading button,.card button:not(.primary),footer button{border:1px solid #d7deea;background:#fff;border-radius:8px;padding:8px 11px;color:#37445b;font-weight:700;cursor:pointer}.primary{border:1px solid #596ae6!important;background:#596ae6!important;color:#fff!important;border-radius:8px;padding:10px 14px;font-weight:700;cursor:pointer}.card input,.form input:not([type=checkbox]),.form select,.form textarea{width:100%;border:1px solid #dce2ed;border-radius:8px;padding:10px 11px;outline:none;font:inherit;color:#293650}.card>input{margin-bottom:16px}.table{overflow:auto}.table table{width:100%;border-collapse:collapse;font-size:13px}.table th{text-align:left;padding:0 12px 11px;color:#77849b;font-size:11px;text-transform:uppercase}.table td{border-top:1px solid #edf0f5;padding:14px 12px;color:#344159;white-space:nowrap}.table tbody tr{cursor:pointer}.table tbody tr:hover{background:#fafbff}.table td button{border:0;background:transparent;color:#50617d;cursor:pointer;margin-right:8px}.table td .delete{color:#be3e4f}.empty{max-width:560px;min-height:300px;margin:auto;padding:45px;text-align:center;display:grid;place-content:center;gap:10px}.empty h1{margin:0;font-size:27px}.empty span{color:#728099;line-height:1.5}.empty.mini{max-width:none;min-height:175px;box-shadow:none;border:0}.empty.mini b{font-size:16px}.empty.mini .primary{margin:8px auto 0}.action{display:flex;align-items:center;justify-content:space-between;gap:20px}.insight{margin-top:18px;padding:20px;background:#f3f6fb;border-radius:9px;color:#66738a;line-height:1.6}.veil{position:fixed;inset:0;z-index:20;background:#101a2d70;display:grid;place-items:center;padding:20px}.modal{position:relative;width:min(650px,100%);max-height:90vh;overflow:auto;padding:24px;background:#fff;border-radius:15px;box-shadow:0 28px 80px #17223850}.modal h2{margin:6px 0 23px}.x{border:0;background:transparent;color:#68758b;font-size:27px;line-height:1;cursor:pointer}.modal>.x,.detail>.x{position:absolute;right:20px;top:20px}.form{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}.form label{display:grid;gap:7px;font-size:13px;font-weight:700;color:#4a5870}.form label b{color:#ce4151}.form textarea{min-height:92px;resize:vertical}.form input[type=checkbox]{width:18px;height:18px;margin:5px 0}footer{display:flex;justify-content:flex-end;gap:10px;margin-top:24px}.detail{position:fixed;z-index:15;right:0;top:0;bottom:0;width:min(430px,100%);overflow:auto;background:#fff;padding:32px;box-shadow:-10px 0 36px #17223824}.detail h2{margin:6px 30px 25px 0;font-size:27px}.detail dl{margin:0}.detail dl div{padding:13px 0;border-top:1px solid #edf0f5}.detail dt{color:#77849a;font-size:11px;text-transform:uppercase}.detail dd{margin:5px 0 0;color:#344159}.related{margin-top:22px;padding-top:18px;border-top:1px solid #edf0f5;color:#52617a}.related div{padding:7px 0}.danger{color:#b52c3d!important;border-color:#ffc9cf!important;background:#fff1f2!important}@media(max-width:720px){.app{display:block}.app>aside:not(.detail){min-height:auto;padding:16px;gap:15px}.app nav{display:flex;overflow:auto}.app nav button{white-space:nowrap}.app>aside small{display:none}.main header{padding:22px 20px}.main article{padding:26px 20px}.main h1{font-size:24px}.form{grid-template-columns:1fr}.action{align-items:flex-start;flex-direction:column}.table th:nth-child(n+4),.table td:nth-child(n+4){display:none}}`}</style>; }

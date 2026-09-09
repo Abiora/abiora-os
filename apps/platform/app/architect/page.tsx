@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import type {
   Analysis,
   Foundation,
@@ -13,6 +14,7 @@ function ArchitectView() {
   const searchParams = useSearchParams();
   const idea = searchParams.get("idea") || "";
 
+  const [authState, setAuthState] = useState<"checking" | "authenticated" | "unauthenticated">("checking");
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -20,7 +22,24 @@ function ArchitectView() {
   const [approved, setApproved] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+    createClient().auth.getUser().then(({ data }) => {
+      if (cancelled) return;
+      if (data.user) {
+        setAuthState("authenticated");
+      } else {
+        setAuthState("unauthenticated");
+        window.location.href = `/login?next=${encodeURIComponent(`/architect?idea=${encodeURIComponent(idea)}`)}`;
+      }
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only needs to run once on mount
+  }, []);
+
+  useEffect(() => {
     async function analyzeIdea() {
+      if (authState !== "authenticated") return;
+
       if (!idea) {
         setError("No product idea was provided.");
         setLoading(false);
@@ -60,7 +79,7 @@ function ArchitectView() {
     }
 
     analyzeIdea();
-  }, [idea]);
+  }, [idea, authState]);
 
   function updateProductName(value: string) {
     setAnalysis((current) =>
