@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type MouseEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -23,7 +23,12 @@ export default function Home() {
     ideaInputRef.current?.focus();
   }
 
-  async function logout() {
+  async function logout(event: MouseEvent<HTMLButtonElement>) {
+    // Prevent the wrapping <form>'s native submit so JS can handle this
+    // without a full page reload. If a handler never attaches (e.g. before
+    // hydration completes), the native form submission still fires and
+    // logs the user out via a plain POST to /api/auth/logout.
+    event.preventDefault();
     try {
       await fetch("/api/auth/logout", { method: "POST" });
     } finally {
@@ -50,9 +55,11 @@ export default function Home() {
         </div>
 
         <div className="sidebar-footer">
-          <button type="button" className="avatar" onClick={logout} aria-label="Log out" title="Log out">
-            A
-          </button>
+          <form action="/api/auth/logout" method="POST">
+            <button type="submit" className="avatar" onClick={logout} aria-label="Log out" title="Log out">
+              A
+            </button>
+          </form>
 
           <div>
             <strong>Account</strong>
@@ -71,9 +78,11 @@ export default function Home() {
           <div className="topbar-links">
             <a href="#">Docs</a>
             <a href="#">Help</a>
-            <button type="button" className="profile-button" onClick={logout} aria-label="Log out" title="Log out">
-              A
-            </button>
+            <form action="/api/auth/logout" method="POST">
+              <button type="submit" className="profile-button" onClick={logout} aria-label="Log out" title="Log out">
+                A
+              </button>
+            </form>
           </div>
         </header>
 
