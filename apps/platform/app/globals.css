@@ -132,47 +132,6 @@ a {
   background: #101117;
 }
 
-.sidebar-footer {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 14px 8px 0;
-  border-top: 1px solid var(--border);
-}
-
-.avatar,
-.profile-button {
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: #151722;
-  color: white;
-  font-weight: 700;
-}
-
-.avatar {
-  width: 36px;
-  height: 36px;
-  flex: 0 0 auto;
-  border: 1px solid #2d3040;
-  cursor: pointer;
-}
-
-.sidebar-footer div:last-child {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.sidebar-footer strong {
-  font-size: 13px;
-}
-
-.sidebar-footer span {
-  color: var(--muted);
-  font-size: 11px;
-}
-
 /* =========================
    MAIN AREA
 ========================= */
@@ -220,11 +179,74 @@ a {
   color: white;
 }
 
-.profile-button {
-  width: 32px;
-  height: 32px;
+.account-menu {
+  position: relative;
+}
+
+.account-menu-trigger {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
   border: 1px solid #303342;
+  background: #151722;
+  color: #fff;
+  font-weight: 700;
   cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.account-menu-trigger:hover {
+  background: #1c1f2c;
+  border-color: var(--border-hover);
+}
+
+.account-menu-trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.account-menu-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 30;
+  min-width: 220px;
+  max-width: calc(100vw - 32px);
+  background: #12131c;
+  border: 1px solid #262a3a;
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+
+.account-menu-email {
+  padding: 10px 12px;
+  color: var(--muted-light);
+  font-size: 12px;
+  word-break: break-all;
+  border-bottom: 1px solid #262a3a;
+  margin-bottom: 6px;
+}
+
+.account-menu-logout {
+  width: 100%;
+  text-align: left;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #ff9aa2;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.account-menu-logout:hover,
+.account-menu-logout:focus-visible {
+  background: rgba(255, 90, 100, 0.1);
+  outline: none;
 }
 
 .dashboard-inner {
@@ -990,8 +1012,7 @@ a {
     margin-bottom: 20px;
   }
 
-  .sidebar-nav,
-  .sidebar-footer {
+  .sidebar-nav {
     display: none;
   }
 

@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { AccountMenu } from "@/components/AccountMenu";
 
 type ApplicationSummary = {
   id: string;
@@ -27,6 +28,7 @@ function timeAgo(iso: string) {
 
 export default function Home() {
   const [authState, setAuthState] = useState<"checking" | "authenticated" | "unauthenticated">("checking");
+  const [userEmail, setUserEmail] = useState("");
   const [idea, setIdea] = useState("");
   const [applications, setApplications] = useState<ApplicationSummary[] | null>(null);
   const [projectsError, setProjectsError] = useState("");
@@ -38,6 +40,7 @@ export default function Home() {
     createClient().auth.getUser().then(({ data }) => {
       if (cancelled) return;
       if (data.user) {
+        setUserEmail(data.user.email ?? "");
         setAuthState("authenticated");
       } else {
         setAuthState("unauthenticated");
@@ -80,19 +83,6 @@ export default function Home() {
     ideaInputRef.current?.focus();
   }
 
-  async function logout(event: MouseEvent<HTMLButtonElement>) {
-    // Prevent the wrapping <form>'s native submit so JS can handle this
-    // without a full page reload. If a handler never attaches (e.g. before
-    // hydration completes), the native form submission still fires and
-    // logs the user out via a plain POST to /api/auth/logout.
-    event.preventDefault();
-    try {
-      await fetch("/api/auth/logout", { method: "POST" });
-    } finally {
-      window.location.href = "/login";
-    }
-  }
-
   if (authState !== "authenticated") {
     return (
       <main className="dashboard-loading">
@@ -117,19 +107,6 @@ export default function Home() {
             </Link>
           </nav>
         </div>
-
-        <div className="sidebar-footer">
-          <form action="/api/auth/logout" method="POST">
-            <button type="submit" className="avatar" onClick={logout} aria-label="Log out" title="Log out">
-              A
-            </button>
-          </form>
-
-          <div>
-            <strong>Account</strong>
-            <span>Founder workspace</span>
-          </div>
-        </div>
       </aside>
 
       <section className="dashboard-content">
@@ -140,11 +117,7 @@ export default function Home() {
           </div>
 
           <div className="topbar-links">
-            <form action="/api/auth/logout" method="POST">
-              <button type="submit" className="profile-button" onClick={logout} aria-label="Log out" title="Log out">
-                A
-              </button>
-            </form>
+            <AccountMenu email={userEmail} />
           </div>
         </header>
 
