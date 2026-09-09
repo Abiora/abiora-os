@@ -50,7 +50,9 @@ export default function Home() {
         </div>
 
         <div className="sidebar-footer">
-          <div className="avatar">A</div>
+          <button type="button" className="avatar" onClick={logout} aria-label="Log out" title="Log out">
+            A
+          </button>
 
           <div>
             <strong>Account</strong>
