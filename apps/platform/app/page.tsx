@@ -23,6 +23,14 @@ export default function Home() {
     ideaInputRef.current?.focus();
   }
 
+  async function logout() {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      window.location.href = "/login";
+    }
+  }
+
   return (
     <main className="dashboard">
       <aside className="sidebar">
@@ -61,7 +69,9 @@ export default function Home() {
           <div className="topbar-links">
             <a href="#">Docs</a>
             <a href="#">Help</a>
-            <button className="profile-button">A</button>
+            <button type="button" className="profile-button" onClick={logout} aria-label="Log out" title="Log out">
+              A
+            </button>
           </div>
         </header>
 
