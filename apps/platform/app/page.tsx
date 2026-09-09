@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 export default function Home() {
   const [idea, setIdea] = useState("");
   const router = useRouter();
+  const ideaInputRef = useRef<HTMLTextAreaElement>(null);
 
   function analyzeIdea() {
     const cleanedIdea = idea.trim();
@@ -17,18 +19,24 @@ export default function Home() {
     router.push(`/architect?idea=${encodeURIComponent(cleanedIdea)}`);
   }
 
+  function focusIdeaInput() {
+    ideaInputRef.current?.focus();
+  }
+
   return (
     <main className="dashboard">
       <aside className="sidebar">
         <div>
           <div className="brand">ABIORA</div>
 
-          <button className="new-project">＋ New Project</button>
+          <button type="button" className="new-project" onClick={focusIdeaInput}>
+            ＋ New Project
+          </button>
 
           <nav className="sidebar-nav">
-            <a href="#" className="active">
+            <Link href="/" className="active">
               Projects
-            </a>
+            </Link>
             <a href="#">Settings</a>
           </nav>
         </div>
@@ -75,6 +83,7 @@ export default function Home() {
 
           <div className="idea-box">
             <textarea
+              ref={ideaInputRef}
               value={idea}
               onChange={(event) => setIdea(event.target.value)}
               placeholder="Describe your SaaS idea..."
