@@ -70,7 +70,19 @@ async function recordExists(applicationId: string, entityName: string, recordId:
   return (result.rowCount ?? 0) > 0;
 }
 
-export async function validateRecordData(entity: Entity, entities: Entity[], applicationId: string, input: unknown): Promise<{ data: RecordData } | { error: string }> {
+/**
+ * `existingData` (update context only; omitted/null for create) is the
+ * record's currently-stored data. When a relationship field's incoming
+ * value is byte-for-byte identical to what's already stored, the
+ * existence check for that field is skipped -- this lets an update to an
+ * unrelated field go through even if the relationship's target was
+ * deleted after this record was created, without weakening validation for
+ * any value that is actually changing. A field with no matching entry in
+ * `existingData` (or no `existingData` at all) is always fully validated,
+ * so create -- which never has a prior record to compare against --
+ * remains exactly as strict as before this parameter existed.
+ */
+export async function validateRecordData(entity: Entity, entities: Entity[], applicationId: string, input: unknown, existingData: RecordData | null = null): Promise<{ data: RecordData } | { error: string }> {
   if (!input || typeof input !== "object" || Array.isArray(input)) return { error: "Record data must be an object." };
   const data = input as Record<string, unknown>;
   const allowed = new Map(editableFields(entity).map((field) => [field.name, field]));
@@ -92,6 +104,7 @@ export async function validateRecordData(entity: Entity, entities: Entity[], app
     const field = allowed.get(name)!;
     const related = relatedEntity(field, entities);
     if (!related) continue;
+    if (existingData && existingData[name] === value) continue;
     if (!(await recordExists(applicationId, related.name, String(value)))) return { error: `Field \"${name}\" refers to a ${related.name} record that does not exist.` };
   }
   return { data: Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined)) as RecordData };

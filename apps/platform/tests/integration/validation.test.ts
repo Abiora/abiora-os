@@ -132,5 +132,114 @@ describe.skipIf(!ready)(
       });
       expect(response.status).toBe(201);
     });
+
+    describe("stale relationship references on update", () => {
+      async function createProject(name: string) {
+        const response = await fetch(`${BASE_URL}/api/records`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Cookie: cookie },
+          body: JSON.stringify({ applicationId, entity: "project", data: { name } }),
+        });
+        expect(response.status).toBe(201);
+        return ((await response.json()).record as { __id: string }).__id;
+      }
+
+      async function createTask(projectId: string) {
+        const response = await fetch(`${BASE_URL}/api/records`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Cookie: cookie },
+          body: JSON.stringify({ applicationId, entity: "task", data: { title: "Original title", projectId } }),
+        });
+        expect(response.status).toBe(201);
+        return ((await response.json()).record as { __id: string }).__id;
+      }
+
+      async function deleteProject(projectId: string) {
+        const response = await fetch(`${BASE_URL}/api/records/${projectId}`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json", Cookie: cookie },
+          body: JSON.stringify({ applicationId, entity: "project" }),
+        });
+        expect(response.status).toBe(204);
+      }
+
+      it("allows updating an unrelated field when the stored relationship value has gone stale", async () => {
+        const projectId = await createProject("Doomed Project");
+        const taskId = await createTask(projectId);
+        await deleteProject(projectId);
+
+        const response = await fetch(`${BASE_URL}/api/records/${taskId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Cookie: cookie },
+          body: JSON.stringify({ applicationId, entity: "task", data: { title: "Updated title", projectId } }),
+        });
+        expect(response.status).toBe(200);
+        expect((await response.json()).record.title).toBe("Updated title");
+      });
+
+      it("still rejects changing a stale relationship to a different nonexistent id", async () => {
+        const projectId = await createProject("Doomed Project 2");
+        const taskId = await createTask(projectId);
+        await deleteProject(projectId);
+
+        const response = await fetch(`${BASE_URL}/api/records/${taskId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Cookie: cookie },
+          body: JSON.stringify({ applicationId, entity: "task", data: { title: "x", projectId: "00000000-0000-4000-8000-000000000000" } }),
+        });
+        expect(response.status).toBe(400);
+        expect((await response.json()).error).toMatch(/does not exist/);
+      });
+
+      it("accepts changing a stale relationship to a different, valid id", async () => {
+        const staleProjectId = await createProject("Doomed Project 3");
+        const taskId = await createTask(staleProjectId);
+        await deleteProject(staleProjectId);
+        const freshProjectId = await createProject("Replacement Project");
+
+        const response = await fetch(`${BASE_URL}/api/records/${taskId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Cookie: cookie },
+          body: JSON.stringify({ applicationId, entity: "task", data: { title: "x", projectId: freshProjectId } }),
+        });
+        expect(response.status).toBe(200);
+        expect((await response.json()).record.projectId).toBe(freshProjectId);
+      });
+
+      it("still allows clearing an optional relationship to blank on update", async () => {
+        const projectId = await createProject("Project To Unlink");
+        const taskId = await createTask(projectId);
+
+        const response = await fetch(`${BASE_URL}/api/records/${taskId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Cookie: cookie },
+          body: JSON.stringify({ applicationId, entity: "task", data: { title: "x", projectId: "" } }),
+        });
+        expect(response.status).toBe(200);
+        expect((await response.json()).record.projectId).toBe("");
+      });
+
+      it("still validates a relationship value that is unchanged but whose target still exists (no regression)", async () => {
+        const projectId = await createProject("Still Alive Project");
+        const taskId = await createTask(projectId);
+
+        const response = await fetch(`${BASE_URL}/api/records/${taskId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Cookie: cookie },
+          body: JSON.stringify({ applicationId, entity: "task", data: { title: "Updated", projectId } }),
+        });
+        expect(response.status).toBe(200);
+        expect((await response.json()).record.projectId).toBe(projectId);
+      });
+
+      it("returns 404 for a well-formed but nonexistent record id, not a validation or server error", async () => {
+        const response = await fetch(`${BASE_URL}/api/records/00000000-0000-4000-8000-000000000000`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Cookie: cookie },
+          body: JSON.stringify({ applicationId, entity: "task", data: { title: "x" } }),
+        });
+        expect(response.status).toBe(404);
+      });
+    });
   }
 );

@@ -142,6 +142,56 @@ describe("validateRecordData", () => {
   });
 });
 
+describe("validateRecordData with existingData (update/stale-relationship handling)", () => {
+  // A real relation-shaped field (projectId -> project), so these prove the
+  // *skip* path specifically never reaches the DB-backed existence check --
+  // unlike the relationship checks in `validateRecordData` above, which stay
+  // hermetic only because they use `noEntities`. The "still validates when
+  // changed" side of this is covered by a live integration test instead
+  // (tests/integration/validation.test.ts), same convention as before.
+  const projectEntity = { name: "project", purpose: "a project", fields: [{ name: "name", type: "string", required: true }] };
+  const taskEntity = {
+    name: "task",
+    purpose: "a task",
+    fields: [
+      { name: "title", type: "string", required: true },
+      { name: "projectId", type: "string", required: false },
+    ],
+  };
+  const relatedEntities = [projectEntity, taskEntity];
+  const appId = "app_unit_test_only";
+  const staleId = "00000000-0000-4000-8000-000000000000"; // would fail an existence check if one ran
+
+  it("skips the existence check when a relationship value is unchanged from existingData", async () => {
+    const result = await validateRecordData(
+      taskEntity,
+      relatedEntities,
+      appId,
+      { title: "new title", projectId: staleId },
+      { title: "old title", projectId: staleId }
+    );
+    expect(result).toEqual({ data: { title: "new title", projectId: staleId } });
+  });
+
+  it("has no effect when existingData is omitted (defaults to null, matching create behavior)", async () => {
+    // No relationship-bearing value is submitted here, so this stays hermetic
+    // either way -- it documents that the parameter is optional and inert
+    // when absent, not that relationship checks are skipped by default.
+    const result = await validateRecordData(taskEntity, relatedEntities, appId, { title: "x" });
+    expect(result).toEqual({ data: { title: "x" } });
+  });
+
+  it("still enforces required-field presence regardless of existingData", async () => {
+    const result = await validateRecordData(taskEntity, relatedEntities, appId, { projectId: staleId }, { title: "old", projectId: staleId });
+    expect("error" in result && result.error).toMatch(/required/);
+  });
+
+  it("still rejects a non-primitive or malformed value regardless of existingData", async () => {
+    const result = await validateRecordData(taskEntity, relatedEntities, appId, { title: { nested: true } }, { title: "old" });
+    expect("error" in result && result.error).toMatch(/simple value/);
+  });
+});
+
 describe("toPublicRecord", () => {
   it("spreads the row's data alongside __id", () => {
     expect(toPublicRecord({ record_id: "abc-123", data: { title: "x" } })).toEqual({

@@ -23,7 +23,8 @@ async function update(request: Request, context: { params: Promise<{ recordId: s
     if (!blueprint) return Response.json({ error: "Application not found." }, { status: 404 });
     const entity = entityForBlueprint(blueprint, entityName);
     if (!entity) return Response.json({ error: "The entity is not available in this application." }, { status: 400 });
-    const validated = await validateRecordData(entity, blueprint.database, applicationId, data);
+    const existing = await getDatabase().query<{ data: Record<string, string | number | boolean | null> }>("SELECT data FROM generated_records WHERE application_id = $1 AND entity_name = $2 AND record_id = $3", [applicationId, entity.name, recordId]);
+    const validated = await validateRecordData(entity, blueprint.database, applicationId, data, existing.rows[0]?.data ?? null);
     if ("error" in validated) return Response.json(validated, { status: 400 });
     const result = await getDatabase().query<{ record_id: string; data: typeof validated.data }>("UPDATE generated_records SET data = $1::jsonb, updated_at = NOW() WHERE application_id = $2 AND entity_name = $3 AND record_id = $4 RETURNING record_id, data", [JSON.stringify(validated.data), applicationId, entity.name, recordId]);
     if (!result.rows[0]) return Response.json({ error: "Record not found." }, { status: 404 });
