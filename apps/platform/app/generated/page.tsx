@@ -175,22 +175,28 @@ function GeneratedAppView() {
   useEffect(() => {
     if (!application || !applicationId) return;
     let cancelled = false;
-    Promise.all(application.database.map(async (entity) => {
-      // limit matches the server's default page size (lib/records.ts); this is a bounded
-      // first page, not the full record set — a "load more" control is a future addition.
-      const response = await fetch(`/api/records?applicationId=${encodeURIComponent(applicationId)}&entity=${encodeURIComponent(entity.name)}&limit=200`);
-      const body = await readJson(response);
-      if (!response.ok) throw new Error(body?.error || `Could not load ${label(entity.name)} records.`);
-      return [entity.name, (body?.records ?? []) as RecordItem[]] as const;
-    })).then((entries) => {
-      if (cancelled) return;
-      setRecords(Object.fromEntries(entries));
-      setRecordsError("");
-    }).catch((error) => {
-      if (cancelled) return;
-      console.error("Load generated records error:", error);
-      setRecordsError(error instanceof Error ? error.message : "Could not load records. Is the database configured?");
-    });
+    const entities = application.database;
+    const concurrency = 3;
+    (async () => {
+      let failure = "";
+      for (let i = 0; i < entities.length; i += concurrency) {
+        const batch = entities.slice(i, i + concurrency);
+        const results = await Promise.allSettled(batch.map(async (entity) => {
+          // limit matches the server's default page size (lib/records.ts); this is a bounded
+          // first page, not the full record set — a "load more" control is a future addition.
+          const response = await fetch(`/api/records?applicationId=${encodeURIComponent(applicationId)}&entity=${encodeURIComponent(entity.name)}&limit=200`);
+          const body = await readJson(response);
+          if (!response.ok) throw new Error(body?.error || `Could not load ${label(entity.name)} records.`);
+          return [entity.name, (body?.records ?? []) as RecordItem[]] as const;
+        }));
+        if (cancelled) return;
+        const succeeded = Object.fromEntries(results.flatMap((result) => (result.status === "fulfilled" ? [result.value] : [])));
+        if (Object.keys(succeeded).length) setRecords((current) => ({ ...current, ...succeeded }));
+        const rejected = results.find((result) => result.status === "rejected");
+        if (rejected && !failure) failure = rejected.reason instanceof Error ? rejected.reason.message : "Could not load records. Is the database configured?";
+      }
+      if (!cancelled) setRecordsError(failure);
+    })();
     return () => { cancelled = true; };
   }, [application, applicationId]);
 
