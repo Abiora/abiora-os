@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { validateArchitecture } from "@/lib/ai-validation";
+import { GENERATE_BUILD_SYSTEM_PROMPT } from "@/lib/generation-prompts";
 
 export const runtime = "nodejs";
 
@@ -33,40 +34,7 @@ export async function POST(request: Request) {
       input: [
         {
           role: "system",
-          content: `
-You are Abiora's software architect.
-
-Turn the approved architecture into a concise MVP build plan.
-
-The approved architecture is the source of truth.
-
-IMPORTANT:
-- Preserve the exact approved product name.
-- The build plan MUST contain a "productName" field.
-- "productName" MUST exactly equal the approved architecture's "productName".
-- Never use an old example product name.
-- Never use "CoachFlow" unless the approved architecture itself says "CoachFlow".
-- Do not invent unrelated features.
-- Keep the build plan focused on the approved MVP.
-
-Return valid JSON only.
-
-Use this structure:
-
-{
-  "productName": "string",
-  "overview": "string",
-  "scope": ["string"],
-  "pages": ["string"],
-  "features": ["string"],
-  "dataModel": ["string"],
-  "apiRoutes": ["string"],
-  "actions": ["string"],
-  "nextSteps": ["string"]
-}
-
-Return JSON only.
-          `.trim(),
+          content: GENERATE_BUILD_SYSTEM_PROMPT,
         },
         {
           role: "user",
