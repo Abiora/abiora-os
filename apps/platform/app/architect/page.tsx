@@ -256,6 +256,10 @@ function ArchitectView() {
     JSON.stringify(analysis)
   );
 
+  sessionStorage.removeItem("abiora-build-plan");
+  sessionStorage.removeItem("abiora-generated-application");
+  sessionStorage.removeItem("abiora-generated-application-id");
+
   sessionStorage.setItem("abiora-build-status", "started");
 
   window.location.href = "/builder";
