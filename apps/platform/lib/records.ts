@@ -18,7 +18,20 @@ const singularize = (value: string) => {
   const v = clean(value);
   return v.endsWith("ies") ? `${v.slice(0, -3)}y` : v.endsWith("s") ? v.slice(0, -1) : v;
 };
-function relatedEntity(field: Field, entities: Entity[]): Entity | undefined {
+// Blueprints declare a relationship field's target either through its name
+// (customerId -> Customer) or, when the name doesn't say it (currentTenant,
+// assignedVendor), through the declared type itself (reference:Tenant,
+// relationship:Vendor). The declared target is matched as a whole singularized
+// name, never as a substring, so e.g. "reference:Order" can't accidentally
+// match a "WorkOrder" entity.
+const declaredRelationshipType = /^(?:reference|relationship)\s*:\s*(.+)$/i;
+export function relatedEntity(field: Field, entities: Entity[]): Entity | undefined {
+  const declared = declaredRelationshipType.exec(field.type);
+  if (declared) {
+    const target = singularize(declared[1]);
+    const match = entities.find((entity) => singularize(entity.name) === target);
+    if (match) return match;
+  }
   return entities.find((entity) => singularize(entity.name) === singularize(field.name.replace(/_?id$/i, "")));
 }
 

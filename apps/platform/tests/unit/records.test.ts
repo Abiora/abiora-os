@@ -4,6 +4,7 @@ import {
   MAX_RECORD_LIMIT,
   entityForBlueprint,
   isApplicationId,
+  relatedEntity,
   resolveLimit,
   resolveOffset,
   toPublicRecord,
@@ -66,6 +67,42 @@ describe("entityForBlueprint", () => {
   it("returns null for an invalid entity name format", () => {
     expect(entityForBlueprint(blueprint, "task name")).toBeNull();
     expect(entityForBlueprint(blueprint, "")).toBeNull();
+  });
+});
+
+describe("relatedEntity", () => {
+  const tenant = { name: "Tenant", purpose: "a tenant", fields: [{ name: "firstName", type: "string", required: true }] };
+  const customer = { name: "Customer", purpose: "a customer", fields: [{ name: "name", type: "string", required: true }] };
+  const vendor = { name: "Vendor", purpose: "a vendor", fields: [{ name: "name", type: "string", required: true }] };
+  const order = { name: "Order", purpose: "an order", fields: [{ name: "total", type: "number", required: true }] };
+  const workOrder = { name: "WorkOrder", purpose: "a work order", fields: [{ name: "summary", type: "string", required: true }] };
+  const barber = { name: "Barber", purpose: "a barber", fields: [{ name: "name", type: "string", required: true }] };
+
+  it("resolves a declared 'reference:Tenant' type to the Tenant entity", () => {
+    expect(relatedEntity({ name: "someField", type: "reference:Tenant", required: false }, [tenant, customer])).toEqual(tenant);
+  });
+
+  it("resolves a declared 'relationship:Customer' type to the Customer entity", () => {
+    expect(relatedEntity({ name: "someField", type: "relationship:Customer", required: false }, [tenant, customer])).toEqual(customer);
+  });
+
+  it("detects currentTenant via its declared type even though the field name doesn't say Tenant", () => {
+    expect(relatedEntity({ name: "currentTenant", type: "reference:Tenant", required: false }, [tenant, customer])).toEqual(tenant);
+  });
+
+  it("detects assignedVendor via its declared type even though the field name doesn't say Vendor", () => {
+    expect(relatedEntity({ name: "assignedVendor", type: "reference:Vendor", required: false }, [vendor, customer])).toEqual(vendor);
+  });
+
+  it("does not let a declared 'reference:Order' incorrectly match a WorkOrder entity", () => {
+    const field = { name: "sourceOrder", type: "reference:Order", required: false };
+    expect(relatedEntity(field, [order, workOrder])).toEqual(order);
+    expect(relatedEntity(field, [workOrder])).toBeUndefined();
+  });
+
+  it("still resolves customerId/barberId-style fields via the name heuristic when the type has no colon", () => {
+    expect(relatedEntity({ name: "customerId", type: "string", required: false }, [customer, vendor])).toEqual(customer);
+    expect(relatedEntity({ name: "barberId", type: "uuid", required: false }, [barber, customer])).toEqual(barber);
   });
 });
 
